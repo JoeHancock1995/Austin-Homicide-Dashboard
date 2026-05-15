@@ -1,51 +1,138 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+/* eslint-disable @next/next/no-img-element -- Dynamic map tiles use computed third-party URLs. */
+
+import React, { useEffect, useMemo, useState } from "react";
 import { RAW_DATA } from "./data/crimeData";
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  CartesianGrid,
 } from "recharts";
-import { MapPin, Search, CalendarDays, Clock, Filter, Target } from "lucide-react";
+import {
+  Activity,
+  CalendarDays,
+  Clock,
+  Crosshair,
+  Filter,
+  LocateFixed,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  Table2,
+} from "lucide-react";
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cx("bg-white", className)}>{children}</div>;
+function Panel({
+  className = "",
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={cx("border border-slate-200 bg-white shadow-sm", className)}>
+      {children}
+    </section>
+  );
 }
 
-function CardContent({ className = "", children }: { className?: string; children: React.ReactNode }) {
-  return <div className={className}>{children}</div>;
+function Badge({
+  className = "",
+  children,
+  style,
+}: {
+  className?: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <span
+      className={cx(
+        "inline-flex min-h-6 items-center rounded px-2 text-[11px] font-semibold uppercase tracking-[0.08em]",
+        className,
+      )}
+      style={style}
+    >
+      {children}
+    </span>
+  );
 }
 
-function Badge({ className = "", children, style }: { className?: string; children: React.ReactNode; style?: React.CSSProperties; variant?: string }) {
-  return <span className={cx("inline-flex items-center px-2.5 py-1 text-xs font-semibold", className)} style={style}>{children}</span>;
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+      {children}
+    </label>
+  );
 }
 
-function Button({ className = "", children, onClick, variant }: { className?: string; children: React.ReactNode; onClick?: () => void; variant?: string }) {
-  return <button type="button" onClick={onClick} className={cx("inline-flex h-10 items-center justify-center border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50", className)}>{children}</button>;
+function SelectField({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <FieldLabel>{label}</FieldLabel>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+      >
+        {children}
+      </select>
+    </div>
+  );
 }
 
-function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cx("w-full border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-300", props.className)} />;
+function Metric({
+  label,
+  value,
+  detail,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 border-l border-slate-200 px-4 py-3 first:border-l-0">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <p className="text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+        <p className="truncate text-xs text-slate-500">{detail}</p>
+      </div>
+    </div>
+  );
 }
-
 
 const crimePalette: Record<string, string> = {
-  MURDER: "#ef4444",
-  "CAPITAL MURDER": "#7f1d1d",
-  MANSLAUGHTER: "#f97316",
-  "CRASH/MANSLAUGHTER": "#eab308",
-  "CRASH/MURDER": "#a855f7",
+  MURDER: "#b91c1c",
+  "CAPITAL MURDER": "#450a0a",
+  MANSLAUGHTER: "#c2410c",
+  "CRASH/MANSLAUGHTER": "#a16207",
+  "CRASH/MURDER": "#6d28d9",
 };
 
 type CrimeRow = {
@@ -63,26 +150,23 @@ type CrimeRow = {
   y: number;
 };
 
-function StatCard({ label, value, icon }: { label: string; value: string | number; icon: React.ReactNode }) {
-  return (
-    <Card className="rounded-2xl shadow-sm border-slate-200">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">{value}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">{icon}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+type CountDatum = {
+  name: string | number;
+  count: number;
+};
 
-function countBy<T extends string | number>(rows: CrimeRow[], getKey: (row: CrimeRow) => T) {
+function countBy<T extends string | number>(
+  rows: CrimeRow[],
+  getKey: (row: CrimeRow) => T,
+) {
   const map = new Map<T, number>();
-  rows.forEach((row) => map.set(getKey(row), (map.get(getKey(row)) || 0) + 1));
-  return Array.from(map, ([name, count]) => ({ name, count })).sort((a, b) => Number(a.name) - Number(b.name));
+  rows.forEach((row) => {
+    const key = getKey(row);
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return Array.from(map, ([name, count]) => ({ name, count })).sort(
+    (a, b) => Number(a.name) - Number(b.name),
+  );
 }
 
 function lonToTileX(lon: number, zoom: number) {
@@ -91,12 +175,33 @@ function lonToTileX(lon: number, zoom: number) {
 
 function latToTileY(lat: number, zoom: number) {
   const latRad = (lat * Math.PI) / 180;
-  return ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * Math.pow(2, zoom);
+  return (
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) *
+    Math.pow(2, zoom)
+  );
 }
 
-function TileMap({ rows, selected, setSelected }: { rows: CrimeRow[]; selected: CrimeRow | null; setSelected: (row: CrimeRow) => void }) {
+function sameIncident(a: CrimeRow | null, b: CrimeRow) {
+  return Boolean(
+    a &&
+      a.date === b.date &&
+      a.time === b.time &&
+      a.address === b.address &&
+      a.crime === b.crime,
+  );
+}
+
+function TileMap({
+  rows,
+  selected,
+  setSelected,
+}: {
+  rows: CrimeRow[];
+  selected: CrimeRow | null;
+  setSelected: (row: CrimeRow) => void;
+}) {
   const width = 760;
-  const height = 520;
+  const height = 540;
   const tileSize = 256;
   const zoom = 11;
   const centerLat = 30.285;
@@ -133,7 +238,7 @@ function TileMap({ rows, selected, setSelected }: { rows: CrimeRow[]; selected: 
   });
 
   return (
-    <div className="relative h-[520px] w-full overflow-hidden rounded-xl bg-slate-200">
+    <div className="relative h-[68vh] min-h-[460px] w-full overflow-hidden bg-slate-200 lg:h-[calc(100vh-292px)] lg:min-h-[560px]">
       {tiles.map((tile) => (
         <img
           key={tile.key}
@@ -144,71 +249,158 @@ function TileMap({ rows, selected, setSelected }: { rows: CrimeRow[]; selected: 
           draggable={false}
         />
       ))}
-      <div className="absolute inset-0 bg-slate-950/5" />
-      {rows.map((row, idx) => {
-        const p = project(row);
-        const isActive = selected && selected.date === row.date && selected.time === row.time && selected.address === row.address;
-        if (p.x < -20 || p.x > width + 20 || p.y < -20 || p.y > height + 20) return null;
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,.08)_1px,transparent_1px)] bg-[size:48px_48px]" />
+      <div className="absolute inset-0 bg-slate-950/10" />
+      {rows.map((row, index) => {
+        const point = project(row);
+        const isActive = sameIncident(selected, row);
+        if (point.x < -20 || point.x > width + 20 || point.y < -20 || point.y > height + 20) {
+          return null;
+        }
+
         return (
           <button
-            key={`${row.date}-${row.time}-${idx}`}
+            key={`${row.date}-${row.time}-${row.address}-${index}`}
             type="button"
-            title={`${row.crime} — ${row.address}`}
+            title={`${row.crime} - ${row.address}`}
             onClick={() => setSelected(row)}
-            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg transition-transform hover:scale-125"
+            className={cx(
+              "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/90 shadow transition-[box-shadow,opacity] duration-200 hover:opacity-100 focus:outline-none focus:ring-4 focus:ring-slate-900/20",
+              isActive ? "z-20 opacity-100" : "z-10 opacity-80",
+            )}
             style={{
-              left: p.x,
-              top: p.y,
-              width: isActive ? 18 : 12,
-              height: isActive ? 18 : 12,
-              backgroundColor: crimePalette[row.crime] || "#38bdf8",
-              boxShadow: isActive ? "0 0 0 8px rgba(239,68,68,.24)" : "0 2px 8px rgba(15,23,42,.28)",
+              left: point.x,
+              top: point.y,
+              width: isActive ? 18 : 11,
+              height: isActive ? 18 : 11,
+              backgroundColor: crimePalette[row.crime] || "#334155",
+              boxShadow: isActive
+                ? "0 0 0 7px rgba(185,28,28,.22), 0 10px 18px rgba(15,23,42,.28)"
+                : "0 3px 8px rgba(15,23,42,.30)",
             }}
           />
         );
       })}
-      <div className="absolute bottom-3 left-3 rounded-lg bg-white/90 px-3 py-2 text-xs text-slate-600 shadow-sm">
+      <div className="absolute left-4 top-4 flex items-center gap-2 rounded border border-slate-900/10 bg-white/92 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm backdrop-blur">
+        <LocateFixed className="h-4 w-4 text-slate-500" />
+        Austin metro operational view
+      </div>
+      <div className="absolute bottom-4 left-4 rounded border border-slate-900/10 bg-white/90 px-3 py-2 text-[11px] text-slate-600 shadow-sm backdrop-blur">
         Map tiles © OpenStreetMap contributors
       </div>
     </div>
   );
 }
 
-function MapView({ rows, selected, setSelected }: { rows: CrimeRow[]; selected: CrimeRow | null; setSelected: (row: CrimeRow) => void }) {
+function SelectedIncident({ selected }: { selected: CrimeRow | null }) {
   return (
-    <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between border-b bg-white px-5 py-4">
+    <div className="border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Selected Incident
+          </p>
+          <h2 className="mt-1 text-base font-semibold text-slate-950">Case inspection</h2>
+        </div>
+        <Crosshair className="h-5 w-5 text-slate-400" />
+      </div>
+
+      {selected ? (
+        <div className="mt-5 space-y-5">
+          <Badge className="text-white" style={{ backgroundColor: crimePalette[selected.crime] || "#334155" }}>
+            {selected.crime}
+          </Badge>
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Incident map</h2>
-            <p className="text-sm text-slate-500">Real map view using the converted latitude/longitude coordinates.</p>
+            <p className="text-xl font-semibold leading-tight text-slate-950">{selected.address}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {selected.date} at {selected.time}
+            </p>
           </div>
-          <Badge className="rounded-full bg-slate-100 text-slate-700">{rows.length} visible</Badge>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                Latitude
+              </p>
+              <p className="mt-1 font-mono text-slate-900">{selected.lat.toFixed(5)}</p>
+            </div>
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                Longitude
+              </p>
+              <p className="mt-1 font-mono text-slate-900">{selected.lon.toFixed(5)}</p>
+            </div>
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                Hour
+              </p>
+              <p className="mt-1 font-mono text-slate-900">{String(selected.hour).padStart(2, "0")}:00</p>
+            </div>
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                Code
+              </p>
+              <p className="mt-1 font-mono text-slate-900">{selected.code}</p>
+            </div>
+          </div>
         </div>
-        <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
-          <div className="relative bg-slate-950 p-4">
-            <TileMap rows={rows} selected={selected} setSelected={setSelected} />
-          </div>
-          <div className="border-l bg-white p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Selected incident</h3>
-            {selected ? (
-              <div className="mt-4 space-y-4">
-                <Badge className="rounded-full text-white" style={{ backgroundColor: crimePalette[selected.crime] || "#0f172a" }}>{selected.crime}</Badge>
-                <div>
-                  <p className="text-xl font-semibold text-slate-950">{selected.address}</p>
-                  <p className="text-sm text-slate-500">{selected.date} at {selected.time}</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
-                  <p>Lat: {selected.lat.toFixed(5)}</p>
-                  <p>Lon: {selected.lon.toFixed(5)}</p>
-                  <p>Offense code: {selected.code}</p>
-                </div>
-              </div>
-            ) : <p className="mt-4 text-sm text-slate-500">Click a point on the map to inspect an incident.</p>}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      ) : (
+        <p className="mt-5 text-sm leading-6 text-slate-500">
+          Select a point on the map or a record in the table to inspect location, time, offense, and coordinates.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ChartPanel({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Panel className="rounded">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+        <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+      </div>
+      <div className="h-64 p-3">{children}</div>
+    </Panel>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="flex h-full items-end gap-2 px-2 pb-2">
+      {[44, 70, 52, 88, 62, 76, 48, 66].map((height, index) => (
+        <div
+          key={index}
+          className="flex-1 rounded-t bg-slate-200"
+          style={{ height: `${height}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value?: number; payload?: CountDatum }>;
+  label?: string | number;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+      <p className="font-semibold text-slate-900">{String(label ?? payload[0].payload?.name ?? "")}</p>
+      <p className="text-slate-600">{payload[0].value} incidents</p>
+    </div>
   );
 }
 
@@ -218,112 +410,321 @@ export default function CrimeDataExplorer() {
   const [year, setYear] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<CrimeRow | null>(data[0]);
+  const [chartsReady, setChartsReady] = useState(false);
 
-  const crimeTypes = useMemo(() => Array.from(new Set(data.map((d) => d.crime))).sort(), [data]);
-  const years = useMemo(() => Array.from(new Set(data.map((d) => d.year))).sort(), [data]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setChartsReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const crimeTypes = useMemo(() => Array.from(new Set(data.map((row) => row.crime))).sort(), [data]);
+  const years = useMemo(() => Array.from(new Set(data.map((row) => row.year))).sort(), [data]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return data.filter((row) =>
-      (crime === "all" || row.crime === crime) &&
-      (year === "all" || String(row.year) === year) &&
-      (!q || row.address.toLowerCase().includes(q) || row.crime.toLowerCase().includes(q))
+    const normalizedQuery = query.trim().toLowerCase();
+    return data.filter(
+      (row) =>
+        (crime === "all" || row.crime === crime) &&
+        (year === "all" || String(row.year) === year) &&
+        (!normalizedQuery ||
+          row.address.toLowerCase().includes(normalizedQuery) ||
+          row.crime.toLowerCase().includes(normalizedQuery)),
     );
   }, [data, crime, year, query]);
 
-  const byCrime = useMemo(() => countBy(filtered, (r) => r.crime).sort((a, b) => b.count - a.count), [filtered]);
-  const byYear = useMemo(() => countBy(filtered, (r) => r.year), [filtered]);
-  const byHour = useMemo(() => countBy(filtered, (r) => r.hour), [filtered]);
-  const dateRange = `${data[0].date} → ${data[data.length - 1].date}`;
+  const byCrime = useMemo(
+    () => countBy(filtered, (row) => row.crime).sort((a, b) => b.count - a.count),
+    [filtered],
+  );
+  const byYear = useMemo(() => countBy(filtered, (row) => row.year), [filtered]);
+  const byHour = useMemo(() => countBy(filtered, (row) => row.hour), [filtered]);
+  const byAddress = useMemo(
+    () => countBy(filtered, (row) => row.address).sort((a, b) => b.count - a.count).slice(0, 5),
+    [filtered],
+  );
+
+  const peakHour = byHour.slice().sort((a, b) => b.count - a.count)[0];
+  const latestIncident = data[data.length - 1];
+  const firstIncident = data[0];
+  const nightCount = filtered.filter((row) => row.hour >= 20 || row.hour < 5).length;
+  const nightShare = filtered.length ? Math.round((nightCount / filtered.length) * 100) : 0;
+  const selectedInFiltered = selected && filtered.some((row) => sameIncident(selected, row));
+
+  function resetFilters() {
+    setCrime("all");
+    setYear("all");
+    setQuery("");
+    setSelected(data[0]);
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 text-slate-950 md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white shadow-sm md:p-8">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <Badge className="mb-3 rounded-full bg-white/10 text-white hover:bg-white/10">CSV data explorer</Badge>
-              <h1 className="text-3xl font-bold tracking-tight md:text-5xl">Homicide incident map + dashboard</h1>
-              <p className="mt-3 max-w-3xl text-slate-300">Interactive visualization for {data.length} uploaded incident records. Filter by offense type, year, and address, then inspect individual map points.</p>
+    <main className="min-h-screen bg-slate-100 text-slate-950">
+      <header className="border-b border-slate-800 bg-slate-950 text-white">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border border-white/15 bg-white/10 text-slate-200">Investigative Intelligence</Badge>
+              <span className="font-mono text-xs text-slate-400">
+                Austin homicide records / {firstIncident.date} to {latestIncident.date}
+              </span>
             </div>
-            <div className="rounded-2xl bg-white/10 p-4 text-sm text-slate-200">
-              <p className="font-medium text-white">Dataset range</p>
-              <p>{dateRange}</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
+              Homicide Analytics Command View
+            </h1>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:w-[560px]">
+            <div className="rounded border border-white/10 bg-white/5 p-3">
+              <p className="text-slate-400">Records</p>
+              <p className="mt-1 font-mono text-lg text-white">{data.length}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-3">
+              <p className="text-slate-400">Visible</p>
+              <p className="mt-1 font-mono text-lg text-white">{filtered.length}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-3">
+              <p className="text-slate-400">Years</p>
+              <p className="mt-1 font-mono text-lg text-white">{years.length}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-3">
+              <p className="text-slate-400">Night share</p>
+              <p className="mt-1 font-mono text-lg text-white">{nightShare}%</p>
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <StatCard label="Visible incidents" value={filtered.length} icon={<Target className="h-5 w-5" />} />
-          <StatCard label="Total records" value={data.length} icon={<MapPin className="h-5 w-5" />} />
-          <StatCard label="Years covered" value={years.length} icon={<CalendarDays className="h-5 w-5" />} />
-          <StatCard label="Peak visible hour" value={`${byHour.slice().sort((a, b) => b.count - a.count)[0]?.name ?? "—"}:00`} icon={<Clock className="h-5 w-5" />} />
-        </section>
-
-        <Card className="rounded-2xl shadow-sm border-slate-200">
-          <CardContent className="p-5">
-            <div className="grid gap-3 md:grid-cols-[1fr_220px_220px_auto] md:items-center">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search address or offense..." className="h-10 rounded-xl pl-9" />
+      <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 lg:grid-cols-[280px_1fr] lg:px-6">
+        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+          <Panel className="rounded">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-slate-500" />
+                <h2 className="text-sm font-semibold text-slate-950">Filters</h2>
               </div>
-              <select value={crime} onChange={(e) => setCrime(e.target.value)} title="Filter by crime type" className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-300">
-                <option value="all">All crime types</option>
-                {crimeTypes.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <select value={year} onChange={(e) => setYear(e.target.value)} title="Filter by year" className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-300">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex h-8 items-center gap-1 rounded border border-slate-300 px-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              <div className="space-y-1.5">
+                <FieldLabel>Address or Offense</FieldLabel>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search records"
+                    className="h-10 w-full rounded border border-slate-300 bg-white pl-9 pr-3 text-sm font-medium text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+              </div>
+
+              <SelectField label="Offense Type" value={crime} onChange={setCrime}>
+                <option value="all">All offense types</option>
+                {crimeTypes.map((crimeType) => (
+                  <option key={crimeType} value={crimeType}>
+                    {crimeType}
+                  </option>
+                ))}
+              </SelectField>
+
+              <SelectField label="Year" value={year} onChange={setYear}>
                 <option value="all">All years</option>
-                {years.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-              </select>
-              <Button variant="outline" className="rounded-xl" onClick={() => { setCrime("all"); setYear("all"); setQuery(""); }}><Filter className="mr-2 h-4 w-4" />Reset</Button>
+                {years.map((entryYear) => (
+                  <option key={entryYear} value={String(entryYear)}>
+                    {entryYear}
+                  </option>
+                ))}
+              </SelectField>
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
 
-        <MapView rows={filtered} selected={selected} setSelected={setSelected} />
-
-        <section className="grid gap-6 lg:grid-cols-3">
-          <Card className="rounded-2xl shadow-sm border-slate-200 lg:col-span-1">
-            <CardContent className="p-5">
-              <h2 className="text-lg font-semibold">By offense type</h2>
-              <div className="mt-4 h-72">
-                <ResponsiveContainer width="100%" height="100%"><BarChart data={byCrime} layout="vertical" margin={{ left: 24 }}><XAxis type="number" hide /><YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="count" radius={[0, 8, 8, 0]} /></BarChart></ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl shadow-sm border-slate-200 lg:col-span-1">
-            <CardContent className="p-5">
-              <h2 className="text-lg font-semibold">By year</h2>
-              <div className="mt-4 h-72">
-                <ResponsiveContainer width="100%" height="100%"><LineChart data={byYear}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis allowDecimals={false} /><Tooltip /><Line type="monotone" dataKey="count" strokeWidth={3} dot /></LineChart></ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl shadow-sm border-slate-200 lg:col-span-1">
-            <CardContent className="p-5">
-              <h2 className="text-lg font-semibold">By hour of day</h2>
-              <div className="mt-4 h-72">
-                <ResponsiveContainer width="100%" height="100%"><BarChart data={byHour}><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="count" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <Card className="rounded-2xl shadow-sm border-slate-200">
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Visible records</h2>
-              <Badge className="rounded-full bg-slate-100 text-slate-700">showing first 60</Badge>
+          <Panel className="rounded">
+            <div className="border-b border-slate-200 px-4 py-3">
+              <h2 className="text-sm font-semibold text-slate-950">Frequent Locations</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Highest recurrence in current view</p>
             </div>
-            <div className="overflow-hidden rounded-xl border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-100 text-slate-600"><tr><th className="p-3">Date</th><th className="p-3">Time</th><th className="p-3">Offense</th><th className="p-3">Address</th><th className="p-3">Lat/Lon</th></tr></thead>
-                <tbody>{filtered.slice(0, 60).map((row, idx) => <tr key={`${row.date}-${row.time}-${idx}`} className="border-t hover:bg-slate-50" onClick={() => setSelected(row)}><td className="p-3">{row.date}</td><td className="p-3">{row.time}</td><td className="p-3"><Badge className="rounded-full border border-slate-300 bg-white text-slate-700">{row.crime}</Badge></td><td className="p-3">{row.address}</td><td className="p-3 text-slate-500">{row.lat.toFixed(4)}, {row.lon.toFixed(4)}</td></tr>)}</tbody>
+            <div className="divide-y divide-slate-100">
+              {byAddress.map((entry) => (
+                <button
+                  key={entry.name}
+                  type="button"
+                  onClick={() => setQuery(String(entry.name))}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-slate-300"
+                >
+                  <span className="min-w-0 truncate text-sm font-medium text-slate-800">{entry.name}</span>
+                  <span className="font-mono text-xs text-slate-500">{entry.count}</span>
+                </button>
+              ))}
+            </div>
+          </Panel>
+        </aside>
+
+        <div className="space-y-4">
+          <Panel className="overflow-hidden rounded">
+            <div className="grid border-b border-slate-200 bg-white sm:grid-cols-2 xl:grid-cols-4">
+              <Metric
+                label="Visible Cases"
+                value={filtered.length}
+                detail={`${Math.round((filtered.length / data.length) * 100)}% of dataset`}
+                icon={<ShieldAlert className="h-4 w-4" />}
+              />
+              <Metric
+                label="Peak Hour"
+                value={peakHour ? `${String(peakHour.name).padStart(2, "0")}:00` : "--"}
+                detail={`${peakHour?.count ?? 0} incidents`}
+                icon={<Clock className="h-4 w-4" />}
+              />
+              <Metric
+                label="Active Years"
+                value={byYear.length}
+                detail={year === "all" ? "full range" : String(year)}
+                icon={<CalendarDays className="h-4 w-4" />}
+              />
+              <Metric
+                label="Offense Mix"
+                value={byCrime.length}
+                detail="types visible"
+                icon={<Activity className="h-4 w-4" />}
+              />
+            </div>
+
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_320px]">
+              <TileMap rows={filtered} selected={selectedInFiltered ? selected : null} setSelected={setSelected} />
+              <SelectedIncident selected={selectedInFiltered ? selected : null} />
+            </div>
+          </Panel>
+
+          <section className="grid gap-4 xl:grid-cols-3">
+            <ChartPanel title="Offense Distribution" subtitle="Sorted by visible incident count">
+              {chartsReady ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={byCrime} layout="vertical" margin={{ left: 8, right: 12 }}>
+                    <XAxis type="number" hide />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={134}
+                      tick={{ fontSize: 11, fill: "#475569" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f1f5f9" }} />
+                    <Bar dataKey="count" radius={[0, 3, 3, 0]}>
+                      {byCrime.map((entry) => (
+                        <Cell key={entry.name} fill={crimePalette[String(entry.name)] || "#334155"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartSkeleton />
+              )}
+            </ChartPanel>
+
+            <ChartPanel title="Annual Trend" subtitle="Case volume by year">
+              {chartsReady ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={byYear} margin={{ top: 10, right: 16, left: -12, bottom: 0 }}>
+                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#475569" }} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#475569" }} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#0f172a"
+                      strokeWidth={2.5}
+                      dot={{ r: 3, fill: "#0f172a" }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartSkeleton />
+              )}
+            </ChartPanel>
+
+            <ChartPanel title="Hour Pattern" subtitle="Incident timing across the day">
+              {chartsReady ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={byHour} margin={{ top: 10, right: 12, left: -14, bottom: 0 }}>
+                    <CartesianGrid stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#475569" }} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f1f5f9" }} />
+                    <Bar dataKey="count" fill="#334155" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartSkeleton />
+              )}
+            </ChartPanel>
+          </section>
+
+          <Panel className="overflow-hidden rounded">
+            <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Table2 className="h-4 w-4 text-slate-500" />
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-950">Incident Records</h2>
+                  <p className="text-xs text-slate-500">First 80 records in the current analytical view</p>
+                </div>
+              </div>
+              <Badge className="border border-slate-200 bg-slate-50 text-slate-600">
+                {Math.min(filtered.length, 80)} shown
+              </Badge>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+                <thead className="bg-slate-50 text-[11px] uppercase tracking-[0.12em] text-slate-500">
+                  <tr>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Date</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Time</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Offense</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Address</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Coordinates</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Code</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.slice(0, 80).map((row, index) => (
+                    <tr
+                      key={`${row.date}-${row.time}-${row.address}-${index}`}
+                      onClick={() => setSelected(row)}
+                      className={cx(
+                        "cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50",
+                        sameIncident(selected, row) && "bg-amber-50/70",
+                      )}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{row.date}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{row.time}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <Badge
+                          className="border border-slate-200 bg-white text-slate-700"
+                          style={{ borderLeftColor: crimePalette[row.crime] || "#334155", borderLeftWidth: 4 }}
+                        >
+                          {row.crime}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{row.address}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500">
+                        {row.lat.toFixed(4)}, {row.lon.toFixed(4)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500">{row.code}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
