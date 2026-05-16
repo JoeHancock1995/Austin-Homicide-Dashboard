@@ -20,6 +20,24 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Deploy to GitHub Pages
+
+This repository is configured to deploy as a static export using GitHub Actions:
+
+- Workflow: `.github/workflows/deploy-pages.yml`
+- Build output: `out/`
+- Production base path: `/Austin-Homicide-Dashboard`
+
+To enable deployment:
+
+1. Go to **Settings → Pages** in the repository.
+2. Set **Source** to **GitHub Actions**.
+3. Push to `main` (or run the workflow manually from the Actions tab).
+
+After deployment, the site will be available at:
+
+- `https://joehancock1995.github.io/Austin-Homicide-Dashboard/`
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
