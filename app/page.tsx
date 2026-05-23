@@ -2,13 +2,12 @@
 
 /* eslint-disable @next/next/no-img-element -- Dynamic map tiles use computed third-party URLs. */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { RAW_DATA } from "./data/crimeData";
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -129,10 +128,10 @@ function Metric({
 
 const crimePalette: Record<string, string> = {
   MURDER: "#b91c1c",
-  "CAPITAL MURDER": "#450a0a",
-  MANSLAUGHTER: "#c2410c",
-  "CRASH/MANSLAUGHTER": "#a16207",
-  "CRASH/MURDER": "#6d28d9",
+  // "MURDER": "#450a0a",
+  // MURDER: "#c2410c",
+  // "MURDER": "#a16207",
+  // "MURDER": "#6d28d9",
 };
 
 type CrimeRow = {
@@ -200,12 +199,13 @@ function TileMap({
   selected: CrimeRow | null;
   setSelected: (row: CrimeRow) => void;
 }) {
-  const width = 760;
-  const height = 540;
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const [viewport, setViewport] = useState({ width: 760, height: 540 });
   const tileSize = 256;
   const zoom = 11;
   const centerLat = 30.285;
   const centerLon = -97.735;
+  const { width, height } = viewport;
   const centerX = lonToTileX(centerLon, zoom) * tileSize;
   const centerY = latToTileY(centerLat, zoom) * tileSize;
   const topLeftX = centerX - width / 2;
@@ -237,8 +237,33 @@ function TileMap({
     y: latToTileY(row.lat, zoom) * tileSize - topLeftY,
   });
 
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const mapElement: HTMLDivElement = mapRef.current;
+
+    function updateViewport() {
+      setViewport((current) => {
+        const next = {
+          width: Math.max(Math.round(mapElement.clientWidth), 1),
+          height: Math.max(Math.round(mapElement.clientHeight), 1),
+        };
+
+        return current.width === next.width && current.height === next.height ? current : next;
+      });
+    }
+
+    updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(mapElement);
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="relative h-[68vh] min-h-[460px] w-full overflow-hidden bg-slate-200 lg:h-[calc(100vh-292px)] lg:min-h-[560px]">
+    <div
+      ref={mapRef}
+      className="relative h-[68vh] min-h-[460px] w-full overflow-hidden bg-slate-200 lg:h-[calc(100vh-292px)] lg:min-h-[560px]"
+    >
       {tiles.map((tile) => (
         <img
           key={tile.key}
@@ -417,7 +442,6 @@ export default function CrimeDataExplorer() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const crimeTypes = useMemo(() => Array.from(new Set(data.map((row) => row.crime))).sort(), [data]);
   const years = useMemo(() => Array.from(new Set(data.map((row) => row.year))).sort(), [data]);
 
   const filtered = useMemo(() => {
@@ -437,6 +461,7 @@ export default function CrimeDataExplorer() {
     [filtered],
   );
   const byYear = useMemo(() => countBy(filtered, (row) => row.year), [filtered]);
+  const byMonth = useMemo(() => countBy(filtered, (row) => row.month), [filtered]);
   const byHour = useMemo(() => countBy(filtered, (row) => row.hour), [filtered]);
   const byAddress = useMemo(
     () => countBy(filtered, (row) => row.address).sort((a, b) => b.count - a.count).slice(0, 5),
@@ -512,7 +537,7 @@ export default function CrimeDataExplorer() {
             </div>
             <div className="space-y-4 p-4">
               <div className="space-y-1.5">
-                <FieldLabel>Address or Offense</FieldLabel>
+                <FieldLabel>Address</FieldLabel>
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <input
@@ -524,14 +549,14 @@ export default function CrimeDataExplorer() {
                 </div>
               </div>
 
-              <SelectField label="Offense Type" value={crime} onChange={setCrime}>
+              {/* <SelectField label="Offense Type" value={crime} onChange={setCrime}>
                 <option value="all">All offense types</option>
                 {crimeTypes.map((crimeType) => (
                   <option key={crimeType} value={crimeType}>
                     {crimeType}
                   </option>
                 ))}
-              </SelectField>
+              </SelectField> */}
 
               <SelectField label="Year" value={year} onChange={setYear}>
                 <option value="all">All years</option>
@@ -601,25 +626,20 @@ export default function CrimeDataExplorer() {
           </Panel>
 
           <section className="grid gap-4 xl:grid-cols-3">
-            <ChartPanel title="Offense Distribution" subtitle="Sorted by visible incident count">
+            <ChartPanel title="Monthly Distribution" subtitle="Incident volume by month">
               {chartsReady ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={byCrime} layout="vertical" margin={{ left: 8, right: 12 }}>
-                    <XAxis type="number" hide />
-                    <YAxis
-                      type="category"
+                  <BarChart data={byMonth} margin={{ top: 10, right: 12, left: -14, bottom: 0 }}>
+                    <CartesianGrid stroke="#e2e8f0" vertical={false} />
+                    <XAxis
                       dataKey="name"
-                      width={134}
-                      tick={{ fontSize: 11, fill: "#475569" }}
-                      axisLine={false}
+                      tick={{ fontSize: 10, fill: "#475569" }}
                       tickLine={false}
+                      interval="preserveStartEnd"
                     />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#475569" }} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f1f5f9" }} />
-                    <Bar dataKey="count" radius={[0, 3, 3, 0]}>
-                      {byCrime.map((entry) => (
-                        <Cell key={entry.name} fill={crimePalette[String(entry.name)] || "#334155"} />
-                      ))}
-                    </Bar>
+                    <Bar dataKey="count" fill="#334155" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
