@@ -40,7 +40,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cx("border border-slate-200 bg-white shadow-sm", className)}>
+    <section className={cx("min-w-0 border border-slate-200 bg-white shadow-sm", className)}>
       {children}
     </section>
   );
@@ -113,7 +113,7 @@ function Metric({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 border-l border-slate-200 px-4 py-3 first:border-l-0">
+    <div className="min-w-0 border-t border-slate-200 px-3 py-3 even:border-l [&:nth-child(-n+2)]:border-t-0 sm:px-4 xl:border-l xl:border-t-0 xl:first:border-l-0">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
         {icon}
         <span>{label}</span>
@@ -262,7 +262,7 @@ function TileMap({
   return (
     <div
       ref={mapRef}
-      className="relative h-[68vh] min-h-[460px] w-full overflow-hidden bg-slate-200 lg:h-[calc(100vh-292px)] lg:min-h-[560px]"
+      className="relative h-[52vh] min-h-[320px] w-full overflow-hidden bg-slate-200 sm:min-h-[420px] lg:h-[calc(100vh-292px)] lg:min-h-[560px]"
     >
       {tiles.map((tile) => (
         <img
@@ -483,9 +483,9 @@ export default function CrimeDataExplorer() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <header className="border-b border-slate-800 bg-slate-950 text-white">
-        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+    <main className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-slate-100 text-slate-950">
+      <header className="w-full max-w-[100vw] overflow-hidden border-b border-slate-800 bg-slate-950 text-white">
+        <div className="mx-auto flex w-full max-w-[100vw] min-w-0 flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6 2xl:max-w-[1600px]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border border-white/15 bg-white/10 text-slate-200">Investigative Intelligence</Badge>
@@ -493,24 +493,24 @@ export default function CrimeDataExplorer() {
                 Austin homicide records / {firstIncident.date} to {latestIncident.date}
               </span>
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
+            <h1 className="mt-2 max-w-full text-pretty text-[1.55rem] font-semibold leading-tight tracking-tight sm:text-2xl md:text-3xl">
               Homicide Analytics Command View
             </h1>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:w-[560px]">
-            <div className="rounded border border-white/10 bg-white/5 p-3">
+          <div className="grid w-full min-w-0 max-w-full grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:w-[560px]">
+            <div className="min-w-0 rounded border border-white/10 bg-white/5 p-3">
               <p className="text-slate-400">Records</p>
               <p className="mt-1 font-mono text-lg text-white">{data.length}</p>
             </div>
-            <div className="rounded border border-white/10 bg-white/5 p-3">
+            <div className="min-w-0 rounded border border-white/10 bg-white/5 p-3">
               <p className="text-slate-400">Visible</p>
               <p className="mt-1 font-mono text-lg text-white">{filtered.length}</p>
             </div>
-            <div className="rounded border border-white/10 bg-white/5 p-3">
+            <div className="min-w-0 rounded border border-white/10 bg-white/5 p-3">
               <p className="text-slate-400">Years</p>
               <p className="mt-1 font-mono text-lg text-white">{years.length}</p>
             </div>
-            <div className="rounded border border-white/10 bg-white/5 p-3">
+            <div className="min-w-0 rounded border border-white/10 bg-white/5 p-3">
               <p className="text-slate-400">Night share</p>
               <p className="mt-1 font-mono text-lg text-white">{nightShare}%</p>
             </div>
@@ -518,18 +518,18 @@ export default function CrimeDataExplorer() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 lg:grid-cols-[280px_1fr] lg:px-6">
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+      <div className="mx-auto grid w-full max-w-[100vw] min-w-0 gap-4 px-4 py-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-6 2xl:max-w-[1600px]">
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start">
           <Panel className="rounded">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-              <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2">
                 <Filter className="h-4 w-4 text-slate-500" />
                 <h2 className="text-sm font-semibold text-slate-950">Filters</h2>
               </div>
               <button
                 type="button"
                 onClick={resetFilters}
-                className="inline-flex h-8 items-center gap-1 rounded border border-slate-300 px-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                className="inline-flex h-8 shrink-0 items-center gap-1 rounded border border-slate-300 px-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Reset
@@ -590,9 +590,9 @@ export default function CrimeDataExplorer() {
           </Panel>
         </aside>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Panel className="overflow-hidden rounded">
-            <div className="grid border-b border-slate-200 bg-white sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 border-b border-slate-200 bg-white xl:grid-cols-4">
               <Metric
                 label="Visible Cases"
                 value={filtered.length}
